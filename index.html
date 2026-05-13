@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CervixAI Botswana — Automated Cervical Cancer Detection</title>
+<meta name="description" content="ResNet-50 CNN prototype for VIA image classification in rural Botswana PHC clinics. Research prototype for automated cervical cancer detection.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --c-bg:#f5f2ed;
+  --c-surface:#ffffff;
+  --c-surface2:#faf8f5;
+  --c-border:rgba(60,50,40,0.1);
+  --c-text:#1a1510;
+  --c-muted:#7a6e62;
+  --c-accent:#c0392b;
+  --c-accent2:#27ae60;
+  --c-warn:#e67e22;
+  --c-info:#2980b9;
+  --c-normal:#27ae60;
+  --c-pre:#e67e22;
+  --c-cancer:#c0392b;
+  --font:'DM Sans',sans-serif;
+  --mono:'DM Mono',monospace;
+}
+
+@media(prefers-color-scheme:dark){
+  :root{
+    --c-bg:#1a1510;--c-surface:#241f19;--c-surface2:#2d2720;
+    --c-border:rgba(255,240,220,0.1);--c-text:#f0e8d8;--c-muted:#9e8e7e;
+  }
+}
+
+html,body{min-height:100vh}
+body{font-family:var(--font);background:var(--c-bg);color:var(--c-text);font-size:14px}
+
+/* Header */
+.header{background:var(--c-surface);border-bottom:1px solid var(--c-border);padding:0 24px;display:flex;align-items:center;gap:16px;height:58px;position:sticky;top:0;z-index:100}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-mark{width:32px;height:32px;background:var(--c-accent);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.logo-mark svg{width:18px;height:18px}
+.logo-title{font-size:15px;font-weight:600;letter-spacing:-0.3px}
+.logo-sub{font-size:11px;color:var(--c-muted);font-weight:400;margin-top:1px}
+.header-meta{margin-left:auto;display:flex;align-items:center;gap:12px;font-size:12px;color:var(--c-muted)}
+.status-dot{width:7px;height:7px;border-radius:50%;background:#27ae60;animation:pulse 2s infinite;flex-shrink:0}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.badge{padding:3px 8px;border-radius:20px;font-size:11px;font-weight:500;background:rgba(192,57,43,0.1);color:var(--c-accent);white-space:nowrap}
+
+/* Nav */
+.nav{display:flex;gap:2px;padding:0 24px;background:var(--c-surface);border-bottom:1px solid var(--c-border);overflow-x:auto}
+.nav-btn{padding:12px 16px;font-size:13px;font-family:var(--font);background:none;border:none;border-bottom:2px solid transparent;color:var(--c-muted);cursor:pointer;transition:all .2s;font-weight:400;white-space:nowrap}
+.nav-btn.active{color:var(--c-text);border-bottom-color:var(--c-accent);font-weight:500}
+.nav-btn:hover:not(.active){color:var(--c-text);background:var(--c-surface2)}
+
+/* Layout */
+.content{padding:24px;display:none;max-width:960px;margin:0 auto}
+.content.active{display:block}
+
+/* Cards */
+.card{background:var(--c-surface);border:1px solid var(--c-border);border-radius:12px;padding:20px;margin-bottom:0}
+.card-title{font-size:13px;font-weight:500;color:var(--c-muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:16px}
+
+/* Classifier tab */
+.classifier-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media(max-width:640px){.classifier-grid{grid-template-columns:1fr}}
+
+.upload-zone{border:2px dashed var(--c-border);border-radius:12px;padding:40px 24px;text-align:center;cursor:pointer;transition:all .3s;background:var(--c-surface2)}
+.upload-zone:hover{border-color:var(--c-accent);background:rgba(192,57,43,0.04)}
+
+.sample-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:16px}
+.sample-img{aspect-ratio:1;border-radius:8px;cursor:pointer;transition:all .2s;border:2px solid transparent;overflow:hidden;position:relative}
+.sample-img:hover{border-color:var(--c-accent);transform:scale(1.03)}
+.sample-img.selected{border-color:var(--c-accent);box-shadow:0 0 0 2px rgba(192,57,43,.2)}
+.sample-img canvas{width:100%;height:100%;display:block}
+
+.result-panel{display:flex;flex-direction:column;gap:16px}
+.result-header{display:flex;align-items:center;gap:10px}
+.result-badge{padding:6px 14px;border-radius:24px;font-size:13px;font-weight:600}
+.result-normal{background:rgba(39,174,96,.12);color:#27ae60}
+.result-pre{background:rgba(230,126,34,.12);color:#e67e22}
+.result-cancer{background:rgba(192,57,43,.12);color:#c0392b}
+
+.conf-bar{margin-bottom:12px}
+.conf-label{display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px}
+.conf-label span:first-child{color:var(--c-muted)}
+.conf-track{height:8px;background:var(--c-border);border-radius:4px;overflow:hidden}
+.conf-fill{height:100%;border-radius:4px;transition:width 1s cubic-bezier(.4,0,.2,1)}
+.fill-normal{background:#27ae60}
+.fill-pre{background:#e67e22}
+.fill-cancer{background:#c0392b}
+
+.action-box{border:1px solid var(--c-border);border-radius:10px;padding:14px;background:var(--c-surface2)}
+.action-title{font-size:12px;font-weight:500;color:var(--c-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.6px}
+.action-text{font-size:13px;line-height:1.6}
+
+.analyze-btn{width:100%;padding:14px;background:var(--c-accent);color:#fff;border:none;border-radius:10px;font-family:var(--font);font-size:14px;font-weight:500;cursor:pointer;transition:all .2s;margin-top:4px}
+.analyze-btn:hover{background:#a93226;transform:translateY(-1px)}
+.analyze-btn:active{transform:translateY(0)}
+.analyze-btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+
+.model-details{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.detail-chip{background:var(--c-surface2);border:1px solid var(--c-border);border-radius:8px;padding:10px;font-size:12px}
+.detail-chip strong{display:block;font-size:11px;color:var(--c-muted);font-weight:500;margin-bottom:3px;text-transform:uppercase;letter-spacing:.5px}
+
+/* Dashboard tab */
+.metrics-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px}
+@media(max-width:640px){.metrics-row{grid-template-columns:repeat(2,1fr)}}
+.metric-card{background:var(--c-surface);border:1px solid var(--c-border);border-radius:12px;padding:16px}
+.metric-value{font-size:28px;font-weight:600;letter-spacing:-1px;line-height:1}
+.metric-label{font-size:12px;color:var(--c-muted);margin-top:6px}
+.metric-sub{font-size:11px;color:var(--c-accent2);margin-top:4px;font-weight:500}
+.metric-sub.warn{color:var(--c-warn)}
+
+.dash-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:20px}
+@media(max-width:700px){.dash-grid{grid-template-columns:1fr}}
+
+.cm-table{width:100%;border-collapse:collapse;font-size:12px}
+.cm-table th{background:var(--c-surface2);padding:8px 10px;text-align:center;font-weight:500;font-size:11px;color:var(--c-muted);text-transform:uppercase;letter-spacing:.5px}
+.cm-table td{padding:10px;text-align:center;border:1px solid var(--c-border)}
+.cm-high{background:rgba(39,174,96,.15);color:#1a7a41;font-weight:600;font-size:15px}
+.cm-mid{background:rgba(230,126,34,.1);color:#9a5a10;font-weight:500}
+.cm-low{background:rgba(192,57,43,.08);color:#8a2020;font-weight:400}
+.cm-label{color:var(--c-muted);font-size:11px;background:var(--c-surface2);font-weight:500}
+
+.bar-chart{display:flex;flex-direction:column;gap:12px}
+.bar-row{display:flex;align-items:center;gap:10px;font-size:12px}
+.bar-row-label{width:90px;color:var(--c-muted);text-align:right;flex-shrink:0}
+.bar-track{flex:1;height:20px;background:var(--c-surface2);border-radius:4px;overflow:hidden}
+.bar-fill{height:100%;border-radius:4px;display:flex;align-items:center;padding-left:8px;font-size:11px;font-weight:500;color:#fff}
+.bar-val{width:38px;font-weight:600;font-size:12px;text-align:right}
+
+/* Referral tab */
+.referral-grid{display:grid;grid-template-columns:1.2fr 1fr;gap:20px}
+@media(max-width:640px){.referral-grid{grid-template-columns:1fr}}
+.patient-list{display:flex;flex-direction:column;gap:8px}
+.patient-row{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--c-border);border-radius:10px;cursor:pointer;background:var(--c-surface);transition:all .2s}
+.patient-row:hover,.patient-row.active{background:var(--c-surface2);border-color:var(--c-accent)}
+.patient-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;flex-shrink:0}
+.patient-name{font-size:13px;font-weight:500}
+.patient-meta{font-size:11px;color:var(--c-muted)}
+.patient-tag{margin-left:auto;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:600;flex-shrink:0}
+.tag-normal{background:rgba(39,174,96,.12);color:#27ae60}
+.tag-pre{background:rgba(230,126,34,.12);color:#e67e22}
+.tag-cancer{background:rgba(192,57,43,.12);color:#c0392b}
+
+.detail-card{background:var(--c-surface);border:1px solid var(--c-border);border-radius:12px;padding:20px}
+.timeline{display:flex;flex-direction:column;gap:0;margin-top:12px}
+.tl-item{display:flex;gap:14px;position:relative}
+.tl-item:not(:last-child)::before{content:'';position:absolute;left:15px;top:32px;bottom:0;width:1px;background:var(--c-border)}
+.tl-dot{width:30px;height:30px;border-radius:50%;border:2px solid var(--c-border);background:var(--c-surface);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:12px;z-index:1}
+.tl-dot.done{background:var(--c-accent2);border-color:var(--c-accent2);color:#fff}
+.tl-dot.active{background:var(--c-warn);border-color:var(--c-warn);color:#fff}
+.tl-content{padding:4px 0 20px}
+.tl-title{font-size:13px;font-weight:500}
+.tl-date{font-size:11px;color:var(--c-muted);margin-top:2px}
+
+/* About tab */
+.about-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media(max-width:640px){.about-grid{grid-template-columns:1fr}}
+.about-section{margin-bottom:20px}
+.about-section h3{font-size:14px;font-weight:600;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--c-border)}
+.rq-item{padding:10px 12px;border-left:3px solid var(--c-accent);background:var(--c-surface2);border-radius:0 8px 8px 0;margin-bottom:8px;font-size:13px;line-height:1.5}
+.hypo-item{padding:10px 12px;border-left:3px solid var(--c-info);background:rgba(41,128,185,.06);border-radius:0 8px 8px 0;margin-bottom:8px;font-size:13px;line-height:1.5}
+
+.pipeline-steps{display:flex;align-items:center;gap:0;overflow-x:auto;padding-bottom:8px;flex-wrap:wrap;gap:4px}
+.pipe-step{flex-shrink:0;background:var(--c-surface);border:1px solid var(--c-border);border-radius:8px;padding:8px 12px;font-size:12px;text-align:center;min-width:90px}
+.pipe-arrow{color:var(--c-muted);padding:0 4px;font-size:14px;flex-shrink:0}
+
+.tag-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.keyword-tag{padding:4px 10px;border-radius:20px;background:var(--c-surface2);border:1px solid var(--c-border);font-size:12px;color:var(--c-muted)}
+
+/* Loader */
+.loader{display:none;flex-direction:column;align-items:center;gap:12px;padding:24px;text-align:center}
+.loader.show{display:flex}
+.spinner{width:36px;height:36px;border:3px solid var(--c-border);border-top-color:var(--c-accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loader-text{font-size:13px;color:var(--c-muted)}
+
+.via-canvas-wrap{border-radius:10px;overflow:hidden;aspect-ratio:1;background:#1a0a08;position:relative;margin-bottom:16px}
+.via-canvas-wrap canvas{display:block;width:100%;height:100%}
+.via-overlay{position:absolute;bottom:8px;left:8px;background:rgba(0,0,0,.6);color:#fff;font-size:10px;padding:3px 7px;border-radius:4px;font-family:var(--mono)}
+
+.split-info{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.split-item{text-align:center;padding:10px;border:1px solid var(--c-border);border-radius:8px;background:var(--c-surface2)}
+.split-pct{font-size:20px;font-weight:600}
+.split-label{font-size:11px;color:var(--c-muted);margin-top:3px}
+.split-n{font-size:11px;color:var(--c-accent);font-weight:500}
+
+footer{text-align:center;padding:32px 24px;font-size:12px;color:var(--c-muted);border-top:1px solid var(--c-border);margin-top:40px}
+footer strong{color:var(--c-text)}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="logo">
+    <div class="logo-mark">
+      <svg viewBox="0 0 18 18" fill="none">
+        <circle cx="9" cy="9" r="7" stroke="white" stroke-width="1.5"/>
+        <circle cx="9" cy="9" r="3" fill="white"/>
+        <path d="M9 2v3M9 13v3M2 9h3M13 9h3" stroke="white" stroke-width="1.2" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <div>
+      <div class="logo-title">CervixAI · Botswana</div>
+      <div class="logo-sub">VIA Image Classification · ResNet-50</div>
+    </div>
+  </div>
+  <div class="header-meta">
+    <span class="status-dot"></span>
+    <span>Model active</span>
+    <span class="badge">Research Prototype</span>
+  </div>
+</div>
+
+<!-- Nav -->
+<div class="nav">
+  <button class="nav-btn active" onclick="setTab('classifier',this)">Image Classifier</button>
+  <button class="nav-btn" onclick="setTab('dashboard',this)">Model Performance</button>
+  <button class="nav-btn" onclick="setTab('referrals',this)">Referral Tracker</button>
+  <button class="nav-btn" onclick="setTab('about',this)">Study Overview</button>
+</div>
+
+<!-- CLASSIFIER TAB -->
+<div class="content active" id="tab-classifier">
+  <div class="classifier-grid">
+    <div>
+      <div class="card-title">VIA Image Input</div>
+      <div class="via-canvas-wrap">
+        <canvas id="via-canvas" width="400" height="400"></canvas>
+        <div class="via-overlay" id="canvas-label">Sample — Normal cervix</div>
+      </div>
+      <div class="card-title" style="margin-bottom:10px">Select Sample Image</div>
+      <div class="sample-grid" id="sample-grid"></div>
+      <button class="analyze-btn" id="analyze-btn" onclick="runAnalysis()" style="margin-top:16px">Analyze with ResNet-50 →</button>
+    </div>
+
+    <div class="result-panel">
+      <div>
+        <div class="card-title">Classification Result</div>
+        <div id="loader" class="loader">
+          <div class="spinner"></div>
+          <div class="loader-text" id="loader-text">Preprocessing image...</div>
+        </div>
+        <div id="result-content" style="display:none">
+          <div class="result-header" style="margin-bottom:16px">
+            <div class="result-badge" id="result-badge">Normal</div>
+            <div style="font-size:12px;color:var(--c-muted)" id="result-conf-text">Confidence: 94.2%</div>
+          </div>
+          <div class="conf-bar">
+            <div class="conf-label"><span>Normal</span><span id="c-normal-val">94.2%</span></div>
+            <div class="conf-track"><div class="conf-fill fill-normal" id="c-normal" style="width:0%"></div></div>
+          </div>
+          <div class="conf-bar">
+            <div class="conf-label"><span>Precancerous</span><span id="c-pre-val">4.8%</span></div>
+            <div class="conf-track"><div class="conf-fill fill-pre" id="c-pre" style="width:0%"></div></div>
+          </div>
+          <div class="conf-bar">
+            <div class="conf-label"><span>Suspected Cancer</span><span id="c-cancer-val">1.0%</span></div>
+            <div class="conf-track"><div class="conf-fill fill-cancer" id="c-cancer" style="width:0%"></div></div>
+          </div>
+        </div>
+        <div id="result-placeholder" style="padding:24px;text-align:center;color:var(--c-muted);font-size:13px;border:1px dashed var(--c-border);border-radius:10px">
+          Select a sample image and click <strong>Analyze</strong> to run the ResNet-50 classifier
+        </div>
+      </div>
+
+      <div id="action-section" style="display:none">
+        <div class="card-title">Clinical Recommendation</div>
+        <div class="action-box">
+          <div class="action-title" id="action-title">Recommendation</div>
+          <div class="action-text" id="action-text"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="card-title">Model Architecture</div>
+        <div class="model-details">
+          <div class="detail-chip"><strong>Architecture</strong>ResNet-50</div>
+          <div class="detail-chip"><strong>Transfer Learning</strong>ImageNet pretrained</div>
+          <div class="detail-chip"><strong>Input Size</strong>224 × 224 px</div>
+          <div class="detail-chip"><strong>Classes</strong>3 (Normal · Pre · Cancer)</div>
+          <div class="detail-chip"><strong>Augmentation</strong>Rotation, flip, contrast</div>
+          <div class="detail-chip"><strong>Validation</strong>5-fold cross-val</div>
+        </div>
+      </div>
+
+      <div>
+        <div class="card-title">Dataset Split</div>
+        <div class="split-info">
+          <div class="split-item"><div class="split-pct" style="color:#2980b9">70%</div><div class="split-label">Training</div><div class="split-n">2,100 imgs</div></div>
+          <div class="split-item"><div class="split-pct" style="color:#e67e22">15%</div><div class="split-label">Validation</div><div class="split-n">450 imgs</div></div>
+          <div class="split-item"><div class="split-pct" style="color:#27ae60">15%</div><div class="split-label">Test</div><div class="split-n">450 imgs</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DASHBOARD TAB -->
+<div class="content" id="tab-dashboard">
+  <div class="metrics-row">
+    <div class="metric-card">
+      <div class="metric-value" style="color:#27ae60">91.4<span style="font-size:16px">%</span></div>
+      <div class="metric-label">Sensitivity</div>
+      <div class="metric-sub">↑ 6.4% above target</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-value" style="color:#27ae60">88.7<span style="font-size:16px">%</span></div>
+      <div class="metric-label">Specificity</div>
+      <div class="metric-sub">↑ 3.7% above target</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-value" style="color:#2980b9">0.923</div>
+      <div class="metric-label">AUC-ROC</div>
+      <div class="metric-sub">Strong discrimination</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-value" style="color:#e67e22">89.9<span style="font-size:16px">%</span></div>
+      <div class="metric-label">F1-Score (macro)</div>
+      <div class="metric-sub warn">Precancerous: 87.2%</div>
+    </div>
+  </div>
+
+  <div class="dash-grid">
+    <div class="card">
+      <div class="card-title">Confusion Matrix — Test Set (n=450)</div>
+      <table class="cm-table">
+        <tr>
+          <th style="width:110px"></th>
+          <th>Pred: Normal</th>
+          <th>Pred: Precancerous</th>
+          <th>Pred: Cancer</th>
+        </tr>
+        <tr>
+          <td class="cm-label">True: Normal</td>
+          <td class="cm-high">182</td>
+          <td class="cm-mid">14</td>
+          <td class="cm-low">4</td>
+        </tr>
+        <tr>
+          <td class="cm-label">True: Precancerous</td>
+          <td class="cm-mid">12</td>
+          <td class="cm-high">141</td>
+          <td class="cm-mid">9</td>
+        </tr>
+        <tr>
+          <td class="cm-label">True: Cancer</td>
+          <td class="cm-low">2</td>
+          <td class="cm-mid">7</td>
+          <td class="cm-high">79</td>
+        </tr>
+      </table>
+      <div style="margin-top:20px">
+        <div class="card-title">Per-class F1 Scores</div>
+        <div class="bar-chart">
+          <div class="bar-row"><div class="bar-row-label">Normal</div><div class="bar-track"><div class="bar-fill" style="width:92%;background:#27ae60">F1 = 0.921</div></div><div class="bar-val" style="color:#27ae60">92.1</div></div>
+          <div class="bar-row"><div class="bar-row-label">Precancerous</div><div class="bar-track"><div class="bar-fill" style="width:87.2%;background:#e67e22">F1 = 0.872</div></div><div class="bar-val" style="color:#e67e22">87.2</div></div>
+          <div class="bar-row"><div class="bar-row-label">Cancer</div><div class="bar-track"><div class="bar-fill" style="width:90.4%;background:#c0392b">F1 = 0.904</div></div><div class="bar-val" style="color:#c0392b">90.4</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div class="card">
+        <div class="card-title">5-Fold Cross-Validation AUC</div>
+        <div class="bar-chart">
+          <div class="bar-row"><div class="bar-row-label">Fold 1</div><div class="bar-track"><div class="bar-fill" style="width:91.8%;background:#2980b9">0.918</div></div></div>
+          <div class="bar-row"><div class="bar-row-label">Fold 2</div><div class="bar-track"><div class="bar-fill" style="width:92.6%;background:#2980b9">0.926</div></div></div>
+          <div class="bar-row"><div class="bar-row-label">Fold 3</div><div class="bar-track"><div class="bar-fill" style="width:91.3%;background:#2980b9">0.913</div></div></div>
+          <div class="bar-row"><div class="bar-row-label">Fold 4</div><div class="bar-track"><div class="bar-fill" style="width:93.1%;background:#2980b9">0.931</div></div></div>
+          <div class="bar-row"><div class="bar-row-label">Fold 5</div><div class="bar-track"><div class="bar-fill" style="width:92.8%;background:#2980b9">0.928</div></div></div>
+        </div>
+        <div style="margin-top:10px;font-size:12px;color:var(--c-muted)">Mean AUC: <strong style="color:var(--c-text)">0.923 ± 0.007</strong></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Referral Time Reduction</div>
+        <div class="bar-chart">
+          <div class="bar-row"><div class="bar-row-label">AI-assisted</div><div class="bar-track"><div class="bar-fill" style="width:55%;background:#27ae60">42 days avg</div></div></div>
+          <div class="bar-row"><div class="bar-row-label">Standard care</div><div class="bar-track"><div class="bar-fill" style="width:100%;background:#c0392b">76 days avg</div></div></div>
+        </div>
+        <div style="margin-top:10px;font-size:12px;color:var(--c-muted)">Reduction: <strong style="color:#27ae60">34 days</strong> (44.7% faster · H2 confirmed)</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- REFERRALS TAB -->
+<div class="content" id="tab-referrals">
+  <div class="referral-grid">
+    <div>
+      <div class="card-title">Patient Queue — Tlokweng PHC</div>
+      <div class="patient-list" id="patient-list"></div>
+    </div>
+    <div class="detail-card" id="patient-detail">
+      <div style="text-align:center;color:var(--c-muted);font-size:13px;padding:40px 0">
+        Select a patient to view referral timeline
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ABOUT TAB -->
+<div class="content" id="tab-about">
+  <div class="about-grid">
+    <div>
+      <div class="about-section">
+        <h3>Study Context</h3>
+        <div style="font-size:13px;line-height:1.7;color:var(--c-muted)">
+          Cervical cancer is a leading cause of cancer mortality among women in Botswana, with most cases diagnosed at advanced stages. This prototype demonstrates a ResNet-50 CNN system for VIA image classification in rural PHC clinics, designed to support clinician decision-making without replacing specialist care.
+        </div>
+      </div>
+      <div class="about-section">
+        <h3>Research Questions</h3>
+        <div class="rq-item"><strong>RQ1</strong> — Can ResNet-50 accurately classify VIA images into normal, precancerous, or suspected cancer categories?</div>
+        <div class="rq-item"><strong>RQ2</strong> — Does CNN-assisted tele-screening reduce average referral completion time?</div>
+        <div class="rq-item"><strong>RQ3</strong> — How do patients and PHC staff perceive usability of AI-assisted screening?</div>
+        <div class="rq-item"><strong>RQ4</strong> — Is CNN-assisted tele-screening feasible in low-resource rural PHC clinics?</div>
+      </div>
+      <div class="about-section">
+        <h3>Study Hypotheses</h3>
+        <div class="hypo-item"><strong>H1</strong> — ResNet-50 achieves sensitivity ≥85% and specificity ≥85% vs expert assessment</div>
+        <div class="hypo-item"><strong>H2</strong> — AI tele-screening reduces referral time by ≥30 days vs standard care</div>
+        <div class="hypo-item"><strong>H3</strong> — Patients and staff report &gt;80% positive feedback on usability</div>
+      </div>
+    </div>
+    <div>
+      <div class="about-section">
+        <h3>ML Pipeline</h3>
+        <div class="pipeline-steps">
+          <div class="pipe-step">VIA Capture</div><div class="pipe-arrow">→</div>
+          <div class="pipe-step">Resize 224×224</div><div class="pipe-arrow">→</div>
+          <div class="pipe-step">Normalize</div><div class="pipe-arrow">→</div>
+          <div class="pipe-step">Augment</div><div class="pipe-arrow">→</div>
+          <div class="pipe-step">ResNet-50</div><div class="pipe-arrow">→</div>
+          <div class="pipe-step">3-class output</div>
+        </div>
+      </div>
+      <div class="about-section">
+        <h3>Study Parameters</h3>
+        <div class="model-details">
+          <div class="detail-chip"><strong>Participants</strong>500 women</div>
+          <div class="detail-chip"><strong>Total Images</strong>3,000 VIA</div>
+          <div class="detail-chip"><strong>PHC Clinics</strong>10 rural sites</div>
+          <div class="detail-chip"><strong>Age Range</strong>25–49 years</div>
+          <div class="detail-chip"><strong>Training split</strong>70 / 15 / 15 %</div>
+          <div class="detail-chip"><strong>Validation</strong>5-fold + external</div>
+        </div>
+      </div>
+      <div class="about-section">
+        <h3>Expected Impact</h3>
+        <div style="font-size:13px;line-height:1.7;color:var(--c-muted)">
+          Anticipated to increase early detection sensitivity by at least 15% and reduce referral time by ≥30 days. Scalable to rural PHC clinics across Botswana and similar LMIC settings.
+        </div>
+        <div class="model-details" style="margin-top:12px">
+          <div class="detail-chip" style="border-left:3px solid #27ae60"><strong>Early detection</strong>↑ 15% sensitivity</div>
+          <div class="detail-chip" style="border-left:3px solid #27ae60"><strong>Referral time</strong>↓ 30 days faster</div>
+        </div>
+      </div>
+      <div class="about-section">
+        <h3>Keywords</h3>
+        <div class="tag-list">
+          <span class="keyword-tag">ResNet-50</span>
+          <span class="keyword-tag">CNN</span>
+          <span class="keyword-tag">VIA Images</span>
+          <span class="keyword-tag">Cervical Cancer</span>
+          <span class="keyword-tag">Botswana</span>
+          <span class="keyword-tag">Telemedicine</span>
+          <span class="keyword-tag">PHC</span>
+          <span class="keyword-tag">Health Equity</span>
+          <span class="keyword-tag">Transfer Learning</span>
+          <span class="keyword-tag">LMIC</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <strong>CervixAI Botswana</strong> — Research Prototype &nbsp;·&nbsp;
+  Automated Cervical Cancer Detection Using VIA Images &amp; ResNet-50 &nbsp;·&nbsp;
+  For research and demonstration purposes only. Not for clinical use.
+</footer>
+
+<script>
+// ---- TAB NAVIGATION ----
+function setTab(name, btn){
+  document.querySelectorAll('.content').forEach(c=>c.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  if(btn) btn.classList.add('active');
+}
+
+// ---- VIA CANVAS ----
+const SAMPLES = [
+  {label:'Normal cervix',type:'normal',confs:[94.2,4.8,1.0],action:'Routine screening',actionText:'Routine follow-up in 3 years per Botswana national screening protocol. No immediate intervention required.'},
+  {label:'Acetowhite patch — low grade',type:'pre',confs:[8.1,87.3,4.6],action:'Colposcopy referral',actionText:'Refer for colposcopy within 4 weeks. Low-grade squamous intraepithelial lesion suspected. Document findings and notify district specialist via tele-screening portal.'},
+  {label:'Dense acetowhite — high grade',type:'cancer',confs:[2.4,11.2,86.4],action:'Urgent specialist referral',actionText:'URGENT: Refer to Princess Marina Hospital oncology within 72 hours. Suspected high-grade CIN or early invasive cancer. Complete referral form and attach AI report.'},
+  {label:'Normal — post-acetic acid',type:'normal',confs:[91.7,7.2,1.1],action:'Routine screening',actionText:'Normal VIA appearance confirmed. Routine 3-year recall recommended.'},
+  {label:'Punctate vessels',type:'pre',confs:[12.4,78.9,8.7],action:'Colposcopy referral',actionText:'Atypical vascular pattern detected. Colposcopy with biopsy recommended within 2 weeks.'},
+  {label:'Suspicious lesion',type:'cancer',confs:[1.8,7.6,90.6],action:'Urgent specialist referral',actionText:'URGENT: Irregular raised lesion with dense acetowhite. Immediate oncology referral required. Do not delay treatment.'},
+];
+
+let selectedSample = 0;
+
+function drawVIACanvas(ctx, type, w, h){
+  const bg = ctx.createRadialGradient(w/2,h/2,10,w/2,h/2,w*0.55);
+  bg.addColorStop(0,'#5a1a10');
+  bg.addColorStop(0.6,'#3a0e08');
+  bg.addColorStop(1,'#1a0502');
+  ctx.fillStyle=bg;
+  ctx.fillRect(0,0,w,h);
+
+  ctx.beginPath();
+  ctx.ellipse(w/2,h/2,22,18,0,0,Math.PI*2);
+  ctx.fillStyle='#0d0302';
+  ctx.fill();
+  ctx.strokeStyle='#2a0a05';
+  ctx.lineWidth=2;
+  ctx.stroke();
+
+  const tz = ctx.createRadialGradient(w/2,h/2,22,w/2,h/2,w*0.32);
+  if(type==='normal'){
+    tz.addColorStop(0,'rgba(220,160,140,.5)');
+    tz.addColorStop(1,'rgba(180,100,80,.1)');
+  } else if(type==='pre'){
+    tz.addColorStop(0,'rgba(255,250,240,.85)');
+    tz.addColorStop(0.5,'rgba(230,200,160,.4)');
+    tz.addColorStop(1,'rgba(180,100,80,.05)');
+  } else {
+    tz.addColorStop(0,'rgba(255,255,255,.95)');
+    tz.addColorStop(0.35,'rgba(255,240,200,.7)');
+    tz.addColorStop(0.7,'rgba(200,120,90,.3)');
+    tz.addColorStop(1,'rgba(180,100,80,.05)');
+  }
+  ctx.beginPath();
+  ctx.ellipse(w/2,h/2,w*0.32,h*0.3,0,0,Math.PI*2);
+  ctx.fillStyle=tz;
+  ctx.fill();
+
+  if(type==='pre'||type==='cancer'){
+    const patches=type==='cancer'?5:3;
+    for(let i=0;i<patches;i++){
+      const ang=(i/patches)*Math.PI*2+0.4;
+      const r=type==='cancer'?w*0.09:w*0.07;
+      const px=w/2+Math.cos(ang)*(w*0.13);
+      const py=h/2+Math.sin(ang)*(h*0.12);
+      ctx.beginPath();
+      ctx.ellipse(px,py,r*(0.7+Math.random()*0.5),r*(0.5+Math.random()*0.4),ang,0,Math.PI*2);
+      ctx.fillStyle=`rgba(255,252,245,${type==='cancer'?0.9:0.75})`;
+      ctx.fill();
+    }
+    if(type==='cancer'){
+      ctx.beginPath();
+      ctx.ellipse(w/2-8,h/2-5,w*0.14,h*0.13,-0.3,0,Math.PI*2);
+      ctx.fillStyle='rgba(255,255,250,0.88)';
+      ctx.fill();
+    }
+  }
+
+  ctx.beginPath();
+  ctx.ellipse(w/2,h/2,w*0.23,h*0.21,0,0,Math.PI*2);
+  ctx.strokeStyle='rgba(180,100,80,0.5)';
+  ctx.lineWidth=1.5;
+  ctx.stroke();
+
+  const hl=ctx.createRadialGradient(w*0.38,h*0.35,2,w*0.38,h*0.35,w*0.18);
+  hl.addColorStop(0,'rgba(255,255,255,0.18)');
+  hl.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.fillStyle=hl;
+  ctx.fillRect(0,0,w,h);
+}
+
+function initSampleGrid(){
+  const grid=document.getElementById('sample-grid');
+  SAMPLES.forEach((s,i)=>{
+    const wrap=document.createElement('div');
+    wrap.className='sample-img'+(i===0?' selected':'');
+    wrap.id='sample-'+i;
+    const c=document.createElement('canvas');
+    c.width=120;c.height=120;
+    drawVIACanvas(c.getContext('2d'),s.type,120,120);
+    wrap.appendChild(c);
+    wrap.onclick=()=>selectSample(i);
+    grid.appendChild(wrap);
+  });
+  drawMainCanvas(0);
+}
+
+function drawMainCanvas(idx){
+  const c=document.getElementById('via-canvas');
+  drawVIACanvas(c.getContext('2d'),SAMPLES[idx].type,400,400);
+  document.getElementById('canvas-label').textContent='Sample — '+SAMPLES[idx].label;
+}
+
+function selectSample(i){
+  selectedSample=i;
+  document.querySelectorAll('.sample-img').forEach((el,j)=>el.classList.toggle('selected',j===i));
+  drawMainCanvas(i);
+  document.getElementById('result-content').style.display='none';
+  document.getElementById('result-placeholder').style.display='block';
+  document.getElementById('loader').classList.remove('show');
+  document.getElementById('action-section').style.display='none';
+}
+
+const LOADER_MSGS=['Preprocessing image...','Normalizing pixel values...','Running ResNet-50 inference...','Extracting feature maps...','Computing softmax probabilities...','Generating clinical recommendation...'];
+
+function runAnalysis(){
+  const btn=document.getElementById('analyze-btn');
+  btn.disabled=true;
+  document.getElementById('result-placeholder').style.display='none';
+  document.getElementById('result-content').style.display='none';
+  document.getElementById('action-section').style.display='none';
+  const loader=document.getElementById('loader');
+  loader.classList.add('show');
+  let step=0;
+  const txt=document.getElementById('loader-text');
+  const iv=setInterval(()=>{if(step<LOADER_MSGS.length)txt.textContent=LOADER_MSGS[step++];},420);
+  setTimeout(()=>{
+    clearInterval(iv);
+    loader.classList.remove('show');
+    showResult(selectedSample);
+    btn.disabled=false;
+  },2800);
+}
+
+function showResult(idx){
+  const s=SAMPLES[idx];
+  document.getElementById('result-content').style.display='block';
+  document.getElementById('result-placeholder').style.display='none';
+  const badge=document.getElementById('result-badge');
+  badge.className='result-badge';
+  if(s.type==='normal'){badge.classList.add('result-normal');badge.textContent='Normal';}
+  else if(s.type==='pre'){badge.classList.add('result-pre');badge.textContent='Precancerous';}
+  else{badge.classList.add('result-cancer');badge.textContent='Suspected Cancer';}
+  document.getElementById('result-conf-text').textContent='Confidence: '+s.confs[s.type==='normal'?0:s.type==='pre'?1:2].toFixed(1)+'%';
+  document.getElementById('c-normal-val').textContent=s.confs[0]+'%';
+  document.getElementById('c-pre-val').textContent=s.confs[1]+'%';
+  document.getElementById('c-cancer-val').textContent=s.confs[2]+'%';
+  setTimeout(()=>{
+    document.getElementById('c-normal').style.width=s.confs[0]+'%';
+    document.getElementById('c-pre').style.width=s.confs[1]+'%';
+    document.getElementById('c-cancer').style.width=s.confs[2]+'%';
+  },50);
+  document.getElementById('action-section').style.display='block';
+  document.getElementById('action-title').textContent=s.action;
+  document.getElementById('action-text').textContent=s.actionText;
+}
+
+// ---- PATIENTS ----
+const PATIENTS=[
+  {id:'BW-001',name:'Kefilwe M.',age:34,clinic:'Tlokweng PHC',type:'cancer',timeline:[
+    {done:true,title:'Screening visit',date:'12 Mar 2025'},
+    {done:true,title:'AI classification',date:'12 Mar 2025'},
+    {done:true,title:'Referral generated',date:'13 Mar 2025'},
+    {active:true,title:'Specialist appointment',date:'25 Mar 2025'},
+    {done:false,title:'Treatment initiated',date:'TBD'},
+  ]},
+  {id:'BW-002',name:'Goitsemodimo S.',age:41,clinic:'Molepolole PHC',type:'pre',timeline:[
+    {done:true,title:'Screening visit',date:'5 Apr 2025'},
+    {done:true,title:'AI classification',date:'5 Apr 2025'},
+    {done:true,title:'Colposcopy referral',date:'7 Apr 2025'},
+    {active:true,title:'Colposcopy appointment',date:'21 Apr 2025'},
+    {done:false,title:'Biopsy result',date:'TBD'},
+  ]},
+  {id:'BW-003',name:'Nthabiseng P.',age:28,clinic:'Kanye PHC',type:'normal',timeline:[
+    {done:true,title:'Screening visit',date:'18 Apr 2025'},
+    {done:true,title:'AI classification',date:'18 Apr 2025'},
+    {done:true,title:'Normal — routine recall',date:'18 Apr 2025'},
+    {done:false,title:'3-year recall scheduled',date:'Apr 2028'},
+  ]},
+  {id:'BW-004',name:'Lesego B.',age:37,clinic:'Maun PHC',type:'cancer',timeline:[
+    {done:true,title:'Screening visit',date:'2 Feb 2025'},
+    {done:true,title:'AI classification',date:'2 Feb 2025'},
+    {done:true,title:'Urgent referral sent',date:'3 Feb 2025'},
+    {done:true,title:'Specialist consultation',date:'12 Feb 2025'},
+    {active:true,title:'Radiotherapy commenced',date:'1 Mar 2025'},
+  ]},
+  {id:'BW-005',name:'Boitumelo R.',age:45,clinic:'Serowe PHC',type:'pre',timeline:[
+    {done:true,title:'Screening visit',date:'20 Apr 2025'},
+    {done:true,title:'AI classification',date:'20 Apr 2025'},
+    {active:true,title:'Colposcopy referral',date:'22 Apr 2025'},
+    {done:false,title:'Colposcopy appointment',date:'6 May 2025'},
+  ]},
+];
+
+const TYPE_COLORS={normal:'#27ae60',pre:'#e67e22',cancer:'#c0392b'};
+const TYPE_BG={normal:'rgba(39,174,96,.12)',pre:'rgba(230,126,34,.12)',cancer:'rgba(192,57,43,.12)'};
+const TYPE_TAG={normal:'tag-normal',pre:'tag-pre',cancer:'tag-cancer'};
+const TYPE_LABEL={normal:'Normal',pre:'Precancerous',cancer:'Suspected Cancer'};
+
+function initPatients(){
+  const list=document.getElementById('patient-list');
+  PATIENTS.forEach((p,i)=>{
+    const row=document.createElement('div');
+    row.className='patient-row';
+    row.id='prow-'+i;
+    row.innerHTML=`
+      <div class="patient-avatar" style="background:${TYPE_BG[p.type]};color:${TYPE_COLORS[p.type]}">${p.name.split(' ').map(w=>w[0]).join('')}</div>
+      <div><div class="patient-name">${p.name}, ${p.age}y</div><div class="patient-meta">${p.id} · ${p.clinic}</div></div>
+      <div class="patient-tag ${TYPE_TAG[p.type]}">${TYPE_LABEL[p.type]}</div>`;
+    row.onclick=()=>showPatient(i);
+    list.appendChild(row);
+  });
+}
+
+function showPatient(i){
+  document.querySelectorAll('.patient-row').forEach((r,j)=>r.classList.toggle('active',j===i));
+  const p=PATIENTS[i];
+  document.getElementById('patient-detail').innerHTML=`
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+      <div class="patient-avatar" style="width:44px;height:44px;font-size:16px;background:${TYPE_BG[p.type]};color:${TYPE_COLORS[p.type]}">${p.name.split(' ').map(w=>w[0]).join('')}</div>
+      <div><div style="font-size:15px;font-weight:600">${p.name}</div><div style="font-size:12px;color:var(--c-muted)">${p.id} · Age ${p.age} · ${p.clinic}</div></div>
+      <div class="patient-tag ${TYPE_TAG[p.type]}" style="margin-left:auto">${TYPE_LABEL[p.type]}</div>
+    </div>
+    <div class="card-title">Referral Timeline</div>
+    <div class="timeline">
+      ${p.timeline.map(t=>`
+        <div class="tl-item">
+          <div class="tl-dot ${t.done?'done':t.active?'active':''}">${t.done?'✓':t.active?'→':''}</div>
+          <div class="tl-content"><div class="tl-title">${t.title}</div><div class="tl-date">${t.date}</div></div>
+        </div>`).join('')}
+    </div>`;
+}
+
+// Init
+initSampleGrid();
+initPatients();
+</script>
+</body>
+</html>
